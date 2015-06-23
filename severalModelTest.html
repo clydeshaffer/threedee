@@ -1,0 +1,43 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<canvas id="myCanvas" style="position:absolute;left:0px;top:0px;">Your browser does not support the HTML5 canvas tag.</canvas>
+
+<script src="threedee.js"></script>
+<script>
+
+function getQueryVariable(variable)
+{
+       var query = window.location.search.substring(1);
+       var vars = query.split("&");
+       for (var i=0;i<vars.length;i++) {
+               var pair = vars[i].split("=");
+               if(pair[0] == variable){return pair[1];}
+       }
+       return(false);
+}
+
+var count = getQueryVariable("count");
+if(count == false) count = 3;	
+
+instantiate(new SceneObject(newModel(), undefined, function(deltaTime, time) {
+	setCameraToEulerAngles(vector(0, time, 0));
+	camera.pos = scale(camera.forward, - 300);
+}));
+
+var modelURL = getQueryVariable("model");
+if(modelURL == false) modelURL = "adcade.obj";
+if(modelURL != false) {
+	modelFromURL(modelURL, function(model) {
+		for(var i = 0; i < count; i ++) {
+			var rndPos = scale(vector(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5) , 100);
+			var loadedObject = new SceneObject(model);		
+			instantiate(loadedObject, rndPos);
+			loadedObject.transform.scale = vector(2,2,2);
+		}
+	});
+}
+
+
+
+
+</script>
+</meta>

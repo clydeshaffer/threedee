@@ -1,0 +1,98 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<canvas id="myCanvas" style="position:absolute;left:0px;top:96px;">Your browser does not support the HTML5 canvas tag.</canvas>
+
+
+<form action="importTest.html" method="get">
+<select name="model" id="modelSelector">
+	<option value="adcade.obj">Adcade</option>
+	<option value="car.obj">Car</option>
+	<option value="ico.obj">Icosahedron</option>
+	<option value="arwing.obj">Starfox</option>
+	<option value="dog.obj">Dog</option>
+	<option value="texTest.obj">Texture Test</option>
+	<option value="monkey.obj">Monkey (many triangles)</option>
+	<option value="intersection.obj">Intersection artifact example</option>
+	<option value="goal.obj">Goooooalllllll</option>
+</select>
+<input type="submit" value="Load">
+<br>
+Effects: (apply by clicking "Load")<br>
+<input id="shimmerBox" type="checkbox" name="shimmer" value="on">Palette Shift<br>
+<input id="warpBox" type="checkbox" name="warping" value="on">Wave Distortion
+</form>
+
+<img id="tex1" style="display:none" visibility="hidden" src="checker.png"/>
+<img id="netTex" style="display:none" visibility="hidden" src="net.png"/>
+
+<script src="threedee.js"></script>
+<script>
+
+renderBackgroundColor = "#000011";
+
+function getQueryVariable(variable)
+{
+       var query = window.location.search.substring(1);
+       var vars = query.split("&");
+       for (var i=0;i<vars.length;i++) {
+               var pair = vars[i].split("=");
+               if(pair[0] == variable){return pair[1];}
+       }
+       return(false);
+}
+
+var doWarping = getQueryVariable("warping");
+var colorSpin = getQueryVariable("shimmer");
+
+var setQuantize = getQueryVariable("quantize");
+if(setQuantize != false) quantizeLevel = setQuantize;
+
+var loadedModelUpdate = function(deltaTime, time) {
+	this.transform.rot = quaternionFromEuler(vector(0, time, 0));
+
+	if(doWarping != false) {
+		for(var i = 0; i < this.model.mesh.verts.length; i ++) {
+			this.model.mesh.verts[i].y += fastCosine(time * 3 + (this.model.mesh.verts[i].x * 3)) * deltaTime / 4;
+		}
+	}
+	
+	if(colorSpin != false) {
+	
+		if(this.model.mesh.palette.length == 1) {
+			this.model.mesh.palette = [
+			vector(255,   0,   0),
+			vector(128, 128,   0),
+			vector(  0, 255,   0),
+			vector(  0, 128, 128),
+			vector(  0,   0, 255),
+			vector(128,   0, 128)
+			];
+		}
+	
+		this.model.mesh.palette.unshift(this.model.mesh.palette.pop());
+	}
+}
+
+var modelURL = getQueryVariable("model");
+if(modelURL == false) modelURL = "adcade.obj";
+if(modelURL != false) {
+	modelFromURL(modelURL, function(model) {
+	
+		//alert(model.mesh.verts.length + " vertices\n" + model.mesh.tris.length + " triangles\n" + model.mesh.palette.length + " colors");
+	
+		var loadedObject = new SceneObject(model, undefined, loadedModelUpdate);
+		
+		instantiate(loadedObject, vector(0,0,500));
+		loadedObject.transform.scale = vector(20,20,20);
+	});
+}
+
+document.getElementById("modelSelector").value = modelURL;
+
+
+if(colorSpin != false) document.getElementById("shimmerBox").checked = true;
+if(doWarping != false) document.getElementById("warpBox").checked = true;
+
+</script>
+
+
+</meta>

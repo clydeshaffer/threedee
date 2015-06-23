@@ -1,0 +1,185 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<canvas id="myCanvas" style="position:absolute;left:0px;top:0px;">Your browser does not support the HTML5 canvas tag.</canvas>
+
+<img id="grassImg" style="display:none" visibility="hidden" src="quick_grass.png"/>
+<img id="futbolImg" style="display:none" visibility="hidden" src="futbol.png"/>
+<img id="netTex" style="display:none" visibility="hidden" src="net.png"/>
+<img id="goalieImg" style="display:none" visibility="hidden" src="goalie.png"/>
+<img id="backgroundImg" style="display:none" visibility="hidden" src="treesbg.png"/>
+<script src="threedee.js"></script>
+<script>
+
+renderBackgroundColor = "#408000";
+//BG image
+var bgLayer = newModel();
+bgLayer.image = document.getElementById("backgroundImg");
+bgLayer.imageSize = 3000;
+instantiate(new SceneObject(bgLayer), vector(0, 300, -1000));
+
+///////////////plant some grass
+var spriteModel = newModel();
+spriteModel.image = document.getElementById("grassImg");
+spriteModel.imageSize = 20;
+
+for(var k = 0; k < 20; k ++) {
+	var offset = Math.random() * 10;
+	for(var i = 0; i < 20; i++) {
+		instantiate(new SceneObject(spriteModel), vector(i * 20 - 200 + offset, -20, k * 20 - 200));	
+	}
+}
+
+////////hire a goalkeeper
+var goalieModel = newModel();
+var goalieHitboxSize = vector(60, 100, 0);
+goalieModel.image = document.getElementById("goalieImg");
+goalieModel.imageSize = 60;
+var goalieControl = null;
+function goalieUpdate(deltaTime, time) {
+	if(goalieControl == null) {
+		this.transform.pos.x = fastSine(time / 2) * 50;
+	} else {
+		this.transform.pos.x += goalieControl * deltaTime * 60;
+	}
+}
+
+var goalieObj = new SceneObject(goalieModel, undefined, goalieUpdate);
+
+instantiate(goalieObj, vector(0, 0, -140));
+
+///////////////////futbol object
+
+var bolModel = newModel();
+bolModel.image = document.getElementById("futbolImg");
+bolModel.imageSize = 20;
+
+function futbolInit() {
+	this.props.velocity = vector(0,0,0);
+}
+
+var gravity = vector(0, -800, 0);
+var groundPlane = -17;
+var returnSqrDist = sqr(300);
+function initialPos() {return vector(0, -groundPlane + 10, 20);}
+
+function futbolUpdate(deltaTime, time) {
+	var cappedDeltaTime = Math.min(deltaTime, 0.25);
+
+	this.props.velocity = sum(this.props.velocity, scale(gravity, cappedDeltaTime));
+	this.transform.pos = sum(this.transform.pos, scale(this.props.velocity, cappedDeltaTime));
+	this.transform.pos = sum(this.transform.pos, scale(gravity, 0.5 * sqr(cappedDeltaTime)));
+	
+	if(this.transform.pos.y < groundPlane) {
+		this.transform.pos.y = groundPlane;
+		this.props.velocity.y *= -0.95;
+	}
+	
+	
+	if(this.transform.pos.z > goalieObj.transform.pos.z && this.transform.pos.z + this.props.velocity.z * deltaTime < goalieObj.transform.pos.z) {
+		if(this.transform.pos.x < goalieObj.transform.pos.x + goalieHitboxSize.x / 2
+			&& this.transform.pos.x > goalieObj.transform.pos.x - goalieHitboxSize.x / 2) {
+				if(this.transform.pos.y < goalieObj.transform.pos.y + goalieHitboxSize.y / 2
+					&& this.transform.pos.y > goalieObj.transform.pos.y - goalieHitboxSize.y / 2) {
+						this.transform.pos.z = goalieObj.transform.pos.z;
+						this.props.velocity.z *= -1;
+				}			
+		}
+	}
+	
+	
+	if(sqrDist(initialPos()	, this.transform.pos) > returnSqrDist) {
+		this.props.velocity = vector(0,0,0);
+		this.transform.pos = initialPos();
+	}
+
+	
+}
+
+var bolObj = new SceneObject(bolModel, futbolInit, futbolUpdate);
+instantiate(bolObj, initialPos());
+
+
+
+
+///////////////Update not specific to object, on empty model
+setCameraToEulerAngles(vector(0, Math.PI, 0));
+camera.pos = scale(camera.forward, -200);
+instantiate(new SceneObject(newModel(), undefined, function(deltaTime, time) {
+
+	if(cnvs.width != window.innerWidth) {
+		cnvs.width = window.innerWidth;
+		cnvs.height = window.innerHeight;
+		lastFov = 0;
+	}
+
+	
+}));
+
+///////////////Spawn goal model
+modelFromURL("goal.obj", function(model) {
+	var loadedObject = new SceneObject(model);
+	instantiate(loadedObject, vector(0,-20,-200));
+	loadedObject.transform.scale = vector(8,8,8);
+});
+
+
+//////////////////handle input
+var touchStartPos = vector(0, 0, 0);
+
+function startTouch(e) {
+	var ev = e;
+	if(e.screenX == undefined) ev = e.changedTouches[0];
+	e.preventDefault();
+	touchStartPos.x = ev.screenX;
+	touchStartPos.y = ev.screenY;
+}
+
+//function moveTouch(e) {
+//}
+
+var targetSpeed = 500;
+
+function endTouch(e) {
+	var ev = e;
+	if(e.screenX == undefined) ev = e.changedTouches[0];
+	e.preventDefault();
+	bolObj.props.velocity.x = touchStartPos.x - ev.screenX;
+	bolObj.props.velocity.y = ev.screenY - touchStartPos.y;
+	
+	bolObj.props.velocity.z = -1 * Math.sqrt(sqr(targetSpeed) - sqr(bolObj.props.velocity.x) - sqr(bolObj.props.velocity.y));
+}
+
+window.ontouchstart = startTouch;
+window.ontouchend = endTouch;
+window.ontouchmove = function(e) {e.preventDefault()};
+
+window.onmousedown = startTouch;
+window.onmouseup = endTouch;
+
+
+var goingLeft = 0;
+var goingRight = 0;
+
+window.onkeydown = function(e) {
+	var key = String.fromCharCode(e.keyCode);
+	
+	if(key == "%") {
+		goingLeft = 1;
+	}
+	
+	if(key == "'") {
+		goingRight = -1;
+	}
+	
+	goalieControl = goingLeft + goingRight;
+}
+
+window.onkeyup = function(e) {
+	var key = String.fromCharCode(e.keyCode);
+	if(key == "%") goingLeft = 0;
+	if(key == "'") goingRight = 0;
+	
+	goalieControl = goingLeft + goingRight;
+}
+
+</script>
+</meta>

@@ -1,0 +1,25 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<canvas id="myCanvas" style="position:absolute;left:0px;top:0px;">Your browser does not support the HTML5 canvas tag.</canvas>
+
+<img id="ballImg" style="display:none" visibility="hidden" src="ball.png"/>
+
+<script src="threedee.js"></script>
+<script>
+
+var spriteModel = newModel();
+spriteModel.image = document.getElementById("ballImg");
+spriteModel.imageSize = 10;
+
+
+for(var i = 0; i < 100; i ++) {
+	var rndPos = scale(vector(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5) , 100);
+	instantiate(new SceneObject(spriteModel), rndPos);
+}
+
+instantiate(new SceneObject(newModel(), undefined, function(deltaTime, time) {
+	setCameraToEulerAngles(vector(0, time, 0));
+	camera.pos = scale(camera.forward, - 300);
+}));
+
+</script>
+</meta>

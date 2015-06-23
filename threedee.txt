@@ -1,0 +1,230 @@
+var c = document.getElementById("myCanvas");
+var ctx = c.getContext("2d");
+
+///////////////////////////VECTORS
+
+var vector = function (x, y, z) {
+    return {
+        x: x,
+        y: y,
+        z: z
+    };
+};
+
+var origin = vector(0, 0, 0);
+
+var sqrDist = function (a, b) {
+    return Math.pow(b.x - a.x, 2) + Math.pow(b.y - a.y, 2) + Math.pow(b.z - a.z, 2);
+};
+
+var diff = function (a, b) {
+    return vector(b.x - a.x, b.y - a.y, b.z - a.z);
+};
+
+var sum = function (a, b) {
+    return vector(a.x + b.x, a.y + b.y, a.z + b.z);
+};
+
+var scale = function (v, factor) {
+    return vector(
+    v.x * factor,
+    v.y * factor,
+    v.z * factor);
+};
+
+var normalize = function (v) {
+    return scale(v, 1 / Math.sqrt(sqrDist(v, origin)));
+};
+
+var dot = function (a, b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+};
+
+///////////////////////////CAMERA, RENDERING MATH
+
+var camera = {
+    pos: {
+        x: 0,
+        y: 0,
+        z: 0
+    },
+    forward: {
+        x: 0,
+        y: 0,
+        z: 1
+    },
+    right: {
+        x: 1,
+        y: 0,
+        z: 0
+    },
+    up: {
+        x: 0,
+        y: 1,
+        z: 0
+    },
+    fov: Math.PI / 3
+};
+
+
+
+var worldToScreen = function (x, y, z) {
+    var v = {
+        x: x,
+        y: y,
+        z: z
+    };
+    var fovFactor = Math.cos((Math.PI - camera.fov) / 2);
+
+    var dirToPoint = normalize(diff(v, camera.pos));
+
+    var xdot = dot(dirToPoint, camera.right);
+    var ydot = dot(dirToPoint, camera.up);
+    
+    if (dot(dirToPoint, camera.forward) >= 0) return {
+        x: -1000000,
+        y: -1000000
+    };
+
+    return {
+        x: xdot * 250 / fovFactor + 250,
+        y: ydot * 250 / fovFactor + 250
+    };
+};
+
+var threedee = function (x, y, z, f) {
+    var transformedPoint = worldToScreen(x, y, z);
+    f.call(ctx, transformedPoint.x, transformedPoint.y);
+};
+
+///////////////////////////MODELS
+var newModel = function () {
+    return {
+        mesh: {
+            verts: [], //vectors, vertex positions local to model
+            tris: [], //size-4 arrays, indicies on verts[], [3] is color
+            palette: [] //strings, color codes
+        },
+        pos: {
+            x: 0,
+            y: 0,
+            z: 0
+        }
+    };
+};
+
+var transformPoint = function(model, v) {
+    return sum(v, model.pos);
+};
+
+var zSortModelTris = function (model) {
+    model.mesh.tris.sort(function(ta, tb) {
+        var taVerts = [model.mesh.verts[ta[0]], model.mesh.verts[ta[1]], model.mesh.verts[ta[2]]];
+        var tbVerts = [model.mesh.verts[tb[0]], model.mesh.verts[tb[1]], model.mesh.verts[tb[2]]];
+        
+        var taDists = taVerts.map(function(v) { return sqrDist(transformPoint(model, v), camera.pos) });
+        var tbDists = tbVerts.map(function(v) { return sqrDist(transformPoint(model, v), camera.pos) });
+        
+        var distA = taDists.reduce(function(a, b) { return a + b}, 0);
+        var distB = tbDists.reduce(function(a, b) { return a + b}, 0);
+        
+       //var distA = taDists.reduce(Math.max, 0);
+       //var distB = tbDists.reduce(Math.max, 0);
+        
+        //var distA = sqrDist(transformPoint(model, midA), camera.pos);
+        //var distB = sqrDist(transformPoint(model, midB), camera.pos);
+
+        
+        return distB - distA;
+    });
+};
+
+//Takes three vectors, draws triangle
+var drawTriangle = function(a, b, c, color) {
+    
+    var mid = scale(sum(sum(a, b), c), 1.0/3.0);
+    
+    ctx.beginPath();
+    threedee(a.x, a.y, a.z, ctx.moveTo);
+    threedee(b.x, b.y, b.z, ctx.lineTo);
+    threedee(c.x, c.y, c.z, ctx.lineTo);
+    threedee(a.x, a.y, a.z, ctx.lineTo);
+    ctx.fillStyle = color;
+    ctx.fill();
+    //ctx.stroke();
+};
+
+//////
+var renderModel = function (model) {
+    zSortModelTris(model); //TODO, have some tracking and checking to see if we don't need to re-sort
+    for(t = 0; t < model.mesh.tris.length; t++) {
+        
+        var color = model.mesh.palette[model.mesh.tris[t][3]];
+        
+        drawTriangle(transformPoint(model, model.mesh.verts[model.mesh.tris[t][0]],color),
+                     transformPoint(model, model.mesh.verts[model.mesh.tris[t][1]], color),
+                     transformPoint(model, model.mesh.verts[model.mesh.tris[t][2]]), color);
+    }
+};
+
+var cube = newModel();
+cube.mesh.verts.push(vector(-10, -10, -10));
+cube.mesh.verts.push(vector(-10, -10, 10));
+cube.mesh.verts.push(vector(-10, 10, -10));
+cube.mesh.verts.push(vector(-10, 10, 10));
+cube.mesh.verts.push(vector(10, -10, -10));
+cube.mesh.verts.push(vector(10, -10, 10));
+cube.mesh.verts.push(vector(10, 10, -10));
+cube.mesh.verts.push(vector(10, 10, 10));
+
+cube.mesh.tris = [[0, 1, 2], [1, 3, 2], [0, 6, 4], [0, 2, 6], [4, 6, 5], [6, 7, 5], [1, 5, 7], [1, 7, 3], [2, 3, 6], [6, 3, 7], [0, 4, 1], [4, 5, 1]];
+
+cube.mesh.palette.push("#3333CC");
+cube.mesh.palette.push("#CC3333");
+cube.mesh.palette.push("#33CC33");
+cube.mesh.palette.push("#CCCC33");
+cube.mesh.palette.push("#33CCCC");
+cube.mesh.palette.push("#CC33CC");
+
+
+var colors = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5];
+
+for(i = 0; i < 12; i++) {
+    cube.mesh.tris[i][3] = colors[i];
+}
+
+cube.pos = vector(0, 0, 100);
+
+
+var cameraPan = 0;
+var time = 0;
+var frameDelay = 30;
+
+var renderLoop = function () {
+    time += frameDelay * 0.001;
+    ctx.clearRect(0, 0, 500, 500);
+    
+    cameraPan = time / 2;
+    
+
+   
+    camera.forward = {
+        x: Math.sin(cameraPan) * -1,
+        y: 0,
+        z: Math.cos(cameraPan)
+    };
+    camera.right = {
+        x: Math.sin(cameraPan - Math.PI / 2) * -1,
+        y: 0,
+        z: Math.cos(cameraPan - Math.PI / 2)
+    };
+
+    camera.pos = sum(cube.pos, scale(camera.forward, -1 * Math.sin(time) * 50 - 100));
+
+    renderModel(cube);
+
+    window.setTimeout(renderLoop, frameDelay);
+
+};
+
+renderLoop();
