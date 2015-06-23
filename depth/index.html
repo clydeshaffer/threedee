@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<title>
+Depth Buffer Experiment
+</title>
+<body>
+<img src='sceneDepth.png' style='display: none;' id='sceneDepthImg'>
+<div style="height:32px; display:block; position:fixed; border:1px solid; background:gray">
+	<input type='range' min="0", max="255" id="slider">
+</div>
+
+<div style="height:32px; display:block"></div>
+<script type='text/javascript'>
+
+	var renderSize = {x : 256, y : 256};
+
+	var buffers = {};
+	var bufferNames = [
+		'sceneColor',
+		'sceneDepth',
+		'fragColor',
+		'fragDepth',
+		'diffDepth'
+	];
+	bufferNames.forEach(function(bname) {
+		buffers[bname] = { c : document.createElement('canvas')};
+		buffers[bname].c.width = renderSize.x;
+		buffers[bname].c.height = renderSize.y;
+		buffers[bname].c.style.border = "1px solid";
+		buffers[bname].ctx = buffers[bname].c.getContext('2d');
+
+		var newDiv = document.createElement('div');
+		var newP = document.createElement('p');
+
+		newDiv.style.display = 'inline-block';
+
+		newDiv.appendChild(buffers[bname].c);
+		newDiv.appendChild(newP);
+		newP.innerHTML = bname;
+
+		document.body.appendChild(newDiv);
+	});
+//////////
+	
+	var grayLevel = 64;
+	var grayColor = "rgb(" + [grayLevel, grayLevel, grayLevel].join(",") + ")";
+	var slider = document.getElementById('slider');
+	slider.parentNode.style.background = grayColor;
+	slider.oninput = function() {
+		grayLevel = slider.value;
+		grayColor = "rgb(" + [grayLevel, grayLevel, grayLevel].join(",") + ")"
+		slider.parentNode.style.background = grayColor;
+		begin();
+	}
+
+	function begin() {
+		var sceneDepthImg = document.getElementById('sceneDepthImg');
+
+		buffers.sceneColor.ctx.globalCompositeOperation = "source-over";
+		buffers.sceneColor.ctx.fillStyle = "#3333CC";
+		buffers.sceneColor.ctx.fillRect(0,0,renderSize.x,renderSize.y);
+		buffers.sceneColor.ctx.globalCompositeOperation = "luminosity";
+		buffers.sceneColor.ctx.drawImage(sceneDepthImg,0,0,renderSize.x,renderSize.y);
+		
+
+		buffers.sceneDepth.ctx.globalCompositeOperation = "source-over";
+		buffers.sceneDepth.ctx.drawImage(sceneDepthImg,0,0,renderSize.x,renderSize.y);
+
+
+		buffers.fragColor.ctx.fillStyle = "#CC3333";
+		buffers.fragColor.ctx.fillRect(renderSize.x / 4,renderSize.y / 4,renderSize.x / 2,renderSize.y / 2);
+
+		buffers.fragDepth.ctx.fillStyle = 'black';
+		buffers.fragDepth.ctx.clearRect(0,0,renderSize.x,renderSize.y);
+		buffers.fragDepth.ctx.fillStyle = grayColor;
+		buffers.fragDepth.ctx.fillRect(renderSize.x / 4,renderSize.y / 4,renderSize.x / 2,renderSize.y / 2);
+
+		buffers.sceneDepth.ctx.globalCompositeOperation = "lighten";
+		buffers.sceneDepth.ctx.drawImage(buffers.fragDepth.c,0,0);
+
+		buffers.diffDepth.ctx.globalCompositeOperation = "source-over";
+		buffers.diffDepth.ctx.drawImage(buffers.sceneDepth.c,0,0);
+		buffers.diffDepth.ctx.globalCompositeOperation = "difference";
+		buffers.diffDepth.ctx.drawImage(buffers.fragDepth.c,0,0);
+
+		buffers.diffDepth.ctx.globalCompositeOperation = "color-dodge";
+		buffers.diffDepth.ctx.fillStyle = 'white';
+		buffers.diffDepth.ctx.fillRect(0,0,renderSize.x,renderSize.y);
+
+		buffers.sceneColor.ctx.globalCompositeOperation = "multiply";
+		buffers.sceneColor.ctx.drawImage(buffers.diffDepth.c, 0, 0);
+
+		buffers.diffDepth.ctx.globalCompositeOperation = "difference";
+		buffers.diffDepth.ctx.fillStyle = 'white';
+		buffers.diffDepth.ctx.fillRect(0,0,renderSize.x,renderSize.y);
+
+		buffers.diffDepth.ctx.globalCompositeOperation = "multiply";
+		buffers.diffDepth.ctx.drawImage(buffers.fragColor.c, 0, 0);
+
+		buffers.sceneColor.ctx.globalCompositeOperation = "lighter";
+		buffers.sceneColor.ctx.drawImage(buffers.diffDepth.c, 0, 0);
+	}
+
+
+//////////
+	var allImages = document.getElementsByTagName("img");
+console.log(allImages);
+	var loadCount = 0;
+	function onOneLoad() {
+		loadCount++;
+		if(loadCount === allImages.length) {
+			begin();
+		}
+	}
+	Array.prototype.forEach.call(allImages, function(i) { i.onload = onOneLoad;});
+////////
+</script>
+</body>
+
+<p>This is a demonstration of Z-sorting in HTML5 canvas without having to iterate over any pixels.</p>
+<p>Use the above slider to change the depth of the fragment.</p>
+<ol>
+	<li>The sceneColor, sceneDepth, fragColor, and fragDepth buffers are given</li>
+	<li>fragDepth is drawn on top of sceneDepth with the global compositing mode set to 'lighten'.</li>
+	<li>sceneDepth is copied into diffDepth</li>
+	<li>Compositing mode is set to 'difference' and fragDepth is drawn into diffDepth.</li>
+	<li>Compositing mode is set to 'color-dodge' and a white fill is applied to diffDepth.</li>
+	<li>diffDepth is drawn onto sceneColor in 'multiply' mode.</li>
+	<li>diffDepth is filled white again, this time with the 'difference' compositing mode. (Invert the image)</li>
+	<li>fragColor is multiplicatively drawn onto diffDepth</li>
+	<li>diffDepth is drawn additively onto sceneColor</li>
+</ol>
+</html>
